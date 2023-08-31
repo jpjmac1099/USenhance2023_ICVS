@@ -18,12 +18,35 @@ class AlignedDataset(BaseDataset):
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         BaseDataset.__init__(self, opt)
-        self.dir_AB = os.path.join(opt.dataroot, opt.phase)  # get the image directory
-        self.AB_paths = sorted(make_dataset(self.dir_AB, opt.max_dataset_size))  # get image paths
+        #opt.phase = os.path.join(opt.phase,'A')
+        '''
+        if self.opt.isTrain:
+            folds = self.opt.training_fold
+        else:
+            folds = self.opt.testing_fold
+        
+        self.A_paths = []
+        for i, fold in enumerate(folds):
+            folds[i] = os.path.join('Fold_' + fold[0],'A')
+            self.dir_A = os.path.join(opt.dataroot, folds[i])  # get the image directory
+            A_paths = make_dataset(self.dir_A, opt.max_dataset_size)  # get image paths
+            self.A_paths += A_paths
+            assert(self.opt.load_size >= self.opt.crop_size)   # crop_size should be smaller than the size of loaded image
+            self.input_nc = self.opt.output_nc if self.opt.direction == 'BtoA' else self.opt.input_nc
+            self.output_nc = self.opt.input_nc if self.opt.direction == 'BtoA' else self.opt.output_nc
+          
+        self.A_paths = sorted(self.A_paths)
+        '''
+        
+        opt.phase = os.path.join(opt.phase,'A')
+        self.dir_A = os.path.join(opt.dataroot, opt.phase)  # get the image directory from A
+        self.A_paths = sorted(make_dataset(self.dir_A, opt.max_dataset_size))  # get image paths
         assert(self.opt.load_size >= self.opt.crop_size)   # crop_size should be smaller than the size of loaded image
         self.input_nc = self.opt.output_nc if self.opt.direction == 'BtoA' else self.opt.input_nc
         self.output_nc = self.opt.input_nc if self.opt.direction == 'BtoA' else self.opt.output_nc
-
+        
+        #self.transform = get_transform(opt, convert=False)
+        
     def __getitem__(self, index):
         """Return a data point and its metadata information.
 
@@ -37,24 +60,26 @@ class AlignedDataset(BaseDataset):
             B_paths (str) - - image paths (same as A_paths)
         """
         # read a image given a random integer index
-        AB_path = self.AB_paths[index]
-        AB = Image.open(AB_path).convert('RGB')
-        # split AB image into A and B
-        w, h = AB.size
-        w2 = int(w / 2)
-        A = AB.crop((0, 0, w2, h))
-        B = AB.crop((w2, 0, w, h))
-
+        A_path = self.A_paths[index]
+        A = Image.open(A_path).convert('RGB')
+        # apply the same transform to both A and B
         # apply the same transform to both A and B
         transform_params = get_params(self.opt, A.size)
+
         A_transform = get_transform(self.opt, transform_params, grayscale=(self.input_nc == 1))
         B_transform = get_transform(self.opt, transform_params, grayscale=(self.output_nc == 1))
 
         A = A_transform(A)
-        B = B_transform(B)
 
-        return {'A': A, 'B': B, 'A_paths': AB_path, 'B_paths': AB_path}
+        if self.opt.noRealImages == False or self.opt.isTrain:
+            B_path = A_path.replace('/A/','/B/')
+            B = Image.open(B_path).convert('RGB')
+            #B_transform = get_transform(self.opt, grayscale=(self.output_nc == 1))
+            B = B_transform(B)
+            return {'A': A, 'B': B, 'A_paths': A_path, 'B_paths': B_path}
+         
+        return {'A': A, 'A_paths': A_path}
 
     def __len__(self):
         """Return the total number of images in the dataset."""
-        return len(self.AB_paths)
+        return len(self.A_paths)
