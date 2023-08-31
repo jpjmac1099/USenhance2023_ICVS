@@ -25,7 +25,7 @@ class PerceptualLoss(torch.nn.Module):
 def load_perceptual_model(device):
     
     model = Classifier()
-    path = r'/home/engssrd/Desktop/Challenge_MICCAI/Ultrasound_perceptual_network/Model/generator__final.pth'
+    path = r'../perceptualnetwork.pth'
     model.load_state_dict(torch.load(path))
     
     return model.to(device)
