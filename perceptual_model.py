@@ -61,9 +61,9 @@ class UltrasoundDataset(Dataset):
 if __name__ == '__main__':
     
     # Paths to your low and high ultrasound image folders
-    low_folder = r'/home/engssrd/Desktop/Challenge_MICCAI/uvcgan2-main/uvcgan2/data/datasets/Challenge_MICCAI/All_folds/train/A'
-    high_folder = r'/home/engssrd/Desktop/Challenge_MICCAI/uvcgan2-main/uvcgan2/data/datasets/Challenge_MICCAI/All_folds/train/B'
-    save_path = r'/home/engssrd/Desktop/Challenge_MICCAI/Ultrasound_perceptual_network/Model'
+    low_folder = r'./datasets/Challenge/train/A'
+    high_folder = r'./datasets/Challenge/train/B'
+    save_path = r'./Ultrasound_perceptual_network/Model'
     num_epochs = 1000
     
     # Define data transformations if needed (e.g., resizing, normalization)
