@@ -32,7 +32,7 @@ python train.py --dataroot ./datasets/Challenge --name train_1 --model cycle_gan
 To see more intermediate results, check out `./checkpoints/train_1/web/index.html`.
 - Test the model:
 ```
-python test.py --dataroot ./datasets/Challenge --name train_1 --model cycle_gan_perceptual_edge_sparse --dataset_mode aligned
+python test.py --dataroot ./datasets/Challenge --name train_1 --model cycle_gan_perceptual_edge_sparse --dataset_mode aligned --noRealImages True
 ```
 - The test results will be saved to a html file here: `./results/train_1/latest_test/index.html`.
 
