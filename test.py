@@ -32,12 +32,15 @@ from data import create_dataset
 from models import create_model
 from util.visualizer import save_images
 from util import html
+import numpy as np
 
+#####################################################################################
+##################################### MAIN ##########################################
+#####################################################################################
 try:
     import wandb
 except ImportError:
     print('Warning: wandb package cannot be found. The option "--use_wandb" will result in error.')
-
 
 if __name__ == '__main__':
     opt = TestOptions().parse()  # get test options
@@ -48,33 +51,62 @@ if __name__ == '__main__':
     opt.no_flip = True    # no flip; comment this line if results on flipped images are needed.
     opt.display_id = -1   # no visdom display; the test code saves the results to a HTML file.
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
-    model = create_model(opt)      # create a model given opt.model and other options
-    model.setup(opt)               # regular setup: load and print networks; create schedulers
-
+    
     # initialize logger
     if opt.use_wandb:
         wandb_run = wandb.init(project=opt.wandb_project_name, name=opt.name, config=opt) if not wandb.run else wandb.run
         wandb_run._label(repo='CycleGAN-and-pix2pix')
+    
+    # traverse all epoch for the evaluation
+    files_list = os.listdir(opt.checkpoints_dir + '/' + opt.name)
+    epoches = []
+    
+    for file in files_list:
+        if 'net_G_B' in file and 'latest' not in file:
+            name = file.split('_')
+            epoches.append(name[0])
+    
+    epoches = sorted(int(x) for x in epoches)
+    for epoch in epoches:
+        print('EPOCH:' + str(epoch))
+        opt.epoch = epoch
+        model = create_model(opt)      # create a model given opt.model and other options
+        model.setup(opt)               # regular setup: load and print networks; create schedulers
+    
+        # create a website
+        web_dir = os.path.join(opt.results_dir, opt.name, '{}_{}'.format(opt.phase, opt.epoch))  # define the website directory
+        if opt.load_iter > 0:  # load_iter is 0 by default
+            web_dir = '{:s}_iter{:d}'.format(web_dir, opt.load_iter)
+        print('creating web directory', web_dir)
+        webpage = html.HTML(web_dir, 'Experiment = %s, Phase = %s, Epoch = %s' % (opt.name, opt.phase, opt.epoch))
+        
+        # test with eval mode. This only affects layers like batchnorm and dropout.
+        # For [pix2pix]: we use batchnorm and dropout in the original pix2pix. You can experiment it with and without eval() mode.
+        # For [CycleGAN]: It should not affect CycleGAN as CycleGAN uses instancenorm without dropout.
+        #if opt.eval:
+            #model.eval()
 
-    # create a website
-    web_dir = os.path.join(opt.results_dir, opt.name, '{}_{}'.format(opt.phase, opt.epoch))  # define the website directory
-    if opt.load_iter > 0:  # load_iter is 0 by default
-        web_dir = '{:s}_iter{:d}'.format(web_dir, opt.load_iter)
-    print('creating web directory', web_dir)
-    webpage = html.HTML(web_dir, 'Experiment = %s, Phase = %s, Epoch = %s' % (opt.name, opt.phase, opt.epoch))
-    # test with eval mode. This only affects layers like batchnorm and dropout.
-    # For [pix2pix]: we use batchnorm and dropout in the original pix2pix. You can experiment it with and without eval() mode.
-    # For [CycleGAN]: It should not affect CycleGAN as CycleGAN uses instancenorm without dropout.
-    if opt.eval:
-        model.eval()
-    for i, data in enumerate(dataset):
-        if i >= opt.num_test:  # only apply our model to opt.num_test images.
-            break
-        model.set_input(data)  # unpack data from data loader
-        model.test()           # run inference
-        visuals = model.get_current_visuals()  # get image results
-        img_path = model.get_image_paths()     # get image paths
-        if i % 5 == 0:  # save images to an HTML file
-            print('processing (%04d)-th image... %s' % (i, img_path))
-        save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize, use_wandb=opt.use_wandb)
-    webpage.save()  # save the HTML
+        for i, data in enumerate(dataset):
+            if i >= opt.num_test:  # only apply our model to opt.num_test images.
+                break
+            model.set_input(data)  # unpack data from data loader
+            model.test()           # run inference
+
+            visuals = model.get_current_visuals()  # get image results
+            visuals['fake_B'] = visuals['fake_B'].detach().cpu().numpy()
+            visuals['real_A'] = visuals['real_A'].detach().cpu().numpy()
+            visuals['rec_A'] = visuals['rec_A'].detach().cpu().numpy()
+            visuals['fake_B'] = (visuals['fake_B']+1)/2
+            visuals['real_A'] = (visuals['real_A']+1)/2
+            visuals['rec_A'] = (visuals['rec_A']+1)/2
+            visuals['fake_B'] = (np.mean(visuals['fake_B'][0], axis = 0)*255).astype('uint8')
+            visuals['real_A'] = (np.mean(visuals['real_A'][0], axis = 0)*255).astype('uint8')
+            visuals['rec_A'] = (np.mean(visuals['rec_A'][0], axis = 0)*255).astype('uint8')
+            
+            img_path = model.get_image_paths()     # get image paths
+            if i % 5 == 0:  # save images to an HTML file
+                print('processing (%04d)-th image... %s' % (i, img_path))
+            save_images(webpage, visuals, img_path, aspect_ratio=opt.aspect_ratio, width=opt.display_winsize, use_wandb=opt.use_wandb)
+            
+        webpage.save()  # save the HTML
+        
